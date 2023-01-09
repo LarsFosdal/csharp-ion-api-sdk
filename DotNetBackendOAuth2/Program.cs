@@ -1,12 +1,11 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.IO;
 using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
-using Newtonsoft.Json.Linq;
 using Thinktecture.IdentityModel.Client;
 using Thinktecture.IdentityModel.Extensions;
+//using Thinktecture.IdentityModel.Http;
 
 namespace Infor.OAuth2SampleConsoleResourceOwner
 {
@@ -25,34 +24,25 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
     /// </summary>
     class Program
     {
-        #region Environment properties
-
-        private const string ResourceOwnerClientId = "<replace with ci from .ionapi file>";
-        private const string ResourceOwnerClientSecret = "<replace with cs from .ionapi file>";
-
-        private const string OAuth2TokenEndpoint = "<replace with pu+ot from .ionapi file>";
-        private const string OAuth2TokenRevocationEndpoint = "<replace with pu+or from .ionapi file>";
-        private const string OAuth2AuthorizationEndpoint = "<replace with pu+oa from .ionapi file>";
-
-        private const string IONAPIBaseUrl = "<replace with ia+'/'+ti from .ionapi file>";
-
-        #endregion
-
-        #region User Properties
-
-        private const string ServiceAccountAccessKey = "<replace with saak from .ionapi file>";
-        private const string ServiceAccountSecretKey = "<replace with sask from .ionapi file>";
-
-        #endregion
 
         private static OAuth2Client _oauth2;
+        private static IonAPICredential IONCred;
+
 
         static void Main(string[] args)
         {
+
+            var reader = new StreamReader("C:\\Users\\foslar\\Downloads\\TIP_FOSLAR_test_ONPREM.ionapi");
+            //var reader = new StreamReader("C:\\Users\\foslar\\Downloads\\TIP-FOSLAR-test_CLOUD.ionapi");
+
+
+            string JsonIONCred = reader.ReadToEnd();
+            IONCred = JsonConvert.DeserializeObject<IonAPICredential>(JsonIONCred);
+
             _oauth2 = new OAuth2Client(
-                new Uri(OAuth2TokenEndpoint),
-                    ResourceOwnerClientId,
-                    ResourceOwnerClientSecret);
+                new Uri(IONCred.OAuth2TokenEndpoint),
+                    IONCred.ResourceOwnerClientId,
+                    IONCred.ResourceOwnerClientSecret);
 
             //Request a token with the provided ServiceAccountAccessKey and ServiceAccountSecretKey
             TokenResponse token = RequestToken();
@@ -102,11 +92,15 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
         {
             var client = new HttpClient
             {
-                BaseAddress = new Uri(IONAPIBaseUrl)
+                BaseAddress = new Uri(IONCred.IONAPIBaseUrl)
             };
 
             client.SetBearerToken(token);
-            var response = client.GetAsync("<replace with API proxy endpoint to test>").Result;
+
+            var cmd = IONCred.IONAPIBaseUrl + "/M3/m3api-rest/execute/MMS200MI/GetServerTime";
+            Console.WriteLine("API Call: " + cmd);
+
+            var response = client.GetAsync(cmd).Result;
 
             if (response.IsSuccessStatusCode)
             {
@@ -124,7 +118,7 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
         private static TokenResponse RequestToken()
         {
             return _oauth2.RequestResourceOwnerPasswordAsync
-                (ServiceAccountAccessKey, ServiceAccountSecretKey).Result;
+                (IONCred.ServiceAccountAccessKey, IONCred.ServiceAccountSecretKey).Result;
         }
 
         private static TokenResponse RefreshToken(string refreshToken)
@@ -138,7 +132,7 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
         private static void RevokeToken(string token, string tokenType)
         {
             var client = new HttpClient();
-            client.SetBasicAuthentication(ResourceOwnerClientId, ResourceOwnerClientSecret);
+            client.SetBasicAuthentication(IONCred.ResourceOwnerClientId, IONCred.ResourceOwnerClientSecret);
 
             var postBody = new Dictionary<string, string>
             {
@@ -146,7 +140,7 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
                 { "token_type_hint", tokenType }
             };
 
-            var result = client.PostAsync(OAuth2TokenRevocationEndpoint, new FormUrlEncodedContent(postBody)).Result;
+            var result = client.PostAsync(IONCred.OAuth2TokenRevocationEndpoint, new FormUrlEncodedContent(postBody)).Result;
 
             if (result.IsSuccessStatusCode)
             {
