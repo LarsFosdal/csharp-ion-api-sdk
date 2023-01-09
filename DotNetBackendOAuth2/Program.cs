@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.Win32;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -26,27 +27,26 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
     {
 
         private static OAuth2Client _oauth2;
-        private static IonAPICredential IONCred;
+        private static IonAPICredential IONAPI;
 
 
         static void Main(string[] args)
         {
 
-            var reader = new StreamReader("C:\\Users\\foslar\\Downloads\\TIP_FOSLAR_test_ONPREM.ionapi");
-            //var reader = new StreamReader("C:\\Users\\foslar\\Downloads\\TIP-FOSLAR-test_CLOUD.ionapi");
+            IONAPI = LoadCredentialsFromRegistry("TIP_FOSLAR_test_ONPREM");
+            //IONAPI = LoadCredentialsFromRegistry("TIP_FOSLAR_test_CLOUD");
+            //IONAPI = LoadCredentialsFromFile("C:\\Users\\foslar\\Downloads\\TIP_FOSLAR_test_ONPREM.ionapi");
+            //IONAPI = LoadCredentialsFromFile("C:\\Users\\foslar\\Downloads\\TIP-FOSLAR-test_CLOUD.ionapi");
 
-
-            string JsonIONCred = reader.ReadToEnd();
-            IONCred = JsonConvert.DeserializeObject<IonAPICredential>(JsonIONCred);
 
             _oauth2 = new OAuth2Client(
-                new Uri(IONCred.OAuth2TokenEndpoint),
-                    IONCred.ResourceOwnerClientId,
-                    IONCred.ResourceOwnerClientSecret);
+                new Uri(IONAPI.OAuth2TokenEndpoint),
+                    IONAPI.ResourceOwnerClientId,
+                    IONAPI.ResourceOwnerClientSecret);
 
             //Request a token with the provided ServiceAccountAccessKey and ServiceAccountSecretKey
             TokenResponse token = RequestToken();
-
+            Console.WriteLine("Request Token");
             ShowResponse(token);
 
             if (!token.IsError)
@@ -58,6 +58,8 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
                 if (token.RefreshToken != null)
                 {
                     token = RefreshToken(token.RefreshToken);
+                    Console.WriteLine("Refresh Token");
+                    ShowResponse(token);
 
                     //It should be possible to continue calling the service with the new token.
 
@@ -66,6 +68,7 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
                         CallService(token.AccessToken);
                     }
                 }
+
 
                 //When there is no need for the token it should be revoked so no further access is allowed.
                 RevokeToken(token.AccessToken, OAuth2Constants.AccessToken);
@@ -81,30 +84,52 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
 
                 //It should not be possible to refresh the token again...
                 token = RefreshToken(token.RefreshToken);
-
+                Console.WriteLine("Refresh Token");
                 ShowResponse(token);
             }
-
+            Console.WriteLine("\n\nPress Enter");
             Console.ReadLine();
+        }
+
+
+        static IonAPICredential LoadCredentialsFromFile(string afilename)
+        {
+            using (var reader = new StreamReader(afilename))
+                do
+                {
+                    var json = reader.ReadToEnd();
+                    return JsonConvert.DeserializeObject<IonAPICredential>(json);
+                } while (reader.EndOfStream);
+        }
+
+
+        static IonAPICredential LoadCredentialsFromRegistry(string akeyname)
+        {
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\TINE\IONAPI"))
+            {
+                object value = key.GetValue(akeyname);
+                string json = value.ToString();
+                return JsonConvert.DeserializeObject<IonAPICredential>(json);
+            }
         }
 
         static void CallService(string token)
         {
             var client = new HttpClient
             {
-                BaseAddress = new Uri(IONCred.IONAPIBaseUrl)
+                BaseAddress = new Uri(IONAPI.IONAPIBaseUrl)
             };
 
             client.SetBearerToken(token);
 
-            var cmd = IONCred.IONAPIBaseUrl + "/M3/m3api-rest/execute/MMS200MI/GetServerTime";
-            Console.WriteLine("API Call: " + cmd);
+            var cmd = IONAPI.IONAPIBaseUrl + "/M3/m3api-rest/execute/MMS200MI/GetServerTime";
+            cmd.ConsoleYellow();
 
             var response = client.GetAsync(cmd).Result;
 
             if (response.IsSuccessStatusCode)
             {
-                "\n\nWebSerivce call response.".ConsoleGreen();
+                "\n\nWebService call response.".ConsoleGreen();
             }
             else
             {
@@ -117,13 +142,14 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
 
         private static TokenResponse RequestToken()
         {
+            "\nUsing RequestToken:".ConsoleGreen();
             return _oauth2.RequestResourceOwnerPasswordAsync
-                (IONCred.ServiceAccountAccessKey, IONCred.ServiceAccountSecretKey).Result;
+                (IONAPI.ServiceAccountAccessKey, IONAPI.ServiceAccountSecretKey).Result;
         }
 
         private static TokenResponse RefreshToken(string refreshToken)
         {
-            "\nUsing refresh token:".ConsoleGreen();
+            "\nUsing RefreshToken:".ConsoleGreen();
             Console.WriteLine(refreshToken);
 
             return _oauth2.RequestRefreshTokenAsync(refreshToken).Result;
@@ -132,7 +158,7 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
         private static void RevokeToken(string token, string tokenType)
         {
             var client = new HttpClient();
-            client.SetBasicAuthentication(IONCred.ResourceOwnerClientId, IONCred.ResourceOwnerClientSecret);
+            client.SetBasicAuthentication(IONAPI.ResourceOwnerClientId, IONAPI.ResourceOwnerClientSecret);
 
             var postBody = new Dictionary<string, string>
             {
@@ -140,7 +166,7 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
                 { "token_type_hint", tokenType }
             };
 
-            var result = client.PostAsync(IONCred.OAuth2TokenRevocationEndpoint, new FormUrlEncodedContent(postBody)).Result;
+            var result = client.PostAsync(IONAPI.OAuth2TokenRevocationEndpoint, new FormUrlEncodedContent(postBody)).Result;
 
             if (result.IsSuccessStatusCode)
             {
@@ -162,7 +188,6 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
                 Console.WriteLine(response.Json);
 
                 "\nAccess Token:".ConsoleGreen();
-
                 Console.WriteLine(response.AccessToken);
             }
             else
