@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Net.Mime;
 using Thinktecture.IdentityModel.Client;
 using Thinktecture.IdentityModel.Extensions;
 //using Thinktecture.IdentityModel.Http;
@@ -32,21 +33,18 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
 
         static void Main(string[] args)
         {
-
-            IONAPI = LoadCredentialsFromRegistry("TIP_FOSLAR_test_ONPREM");
-            //IONAPI = LoadCredentialsFromRegistry("TIP_FOSLAR_test_CLOUD");
-            //IONAPI = LoadCredentialsFromFile("C:\\Users\\foslar\\Downloads\\TIP_FOSLAR_test_ONPREM.ionapi");
-            //IONAPI = LoadCredentialsFromFile("C:\\Users\\foslar\\Downloads\\TIP-FOSLAR-test_CLOUD.ionapi");
+            IONAPI = IonAPICredential.FromRegistry("TIP_FOSLAR_test_ONPREM");
+            //IONAPI = IonAPICredential.FromRegistry("TIP_FOSLAR_test_CLOUD");
 
 
             _oauth2 = new OAuth2Client(
                 new Uri(IONAPI.OAuth2TokenEndpoint),
-                    IONAPI.ResourceOwnerClientId,
-                    IONAPI.ResourceOwnerClientSecret);
+                        IONAPI.ResourceOwnerClientId,
+                        IONAPI.ResourceOwnerClientSecret);
 
             //Request a token with the provided ServiceAccountAccessKey and ServiceAccountSecretKey
             TokenResponse token = RequestToken();
-            Console.WriteLine("Request Token");
+
             ShowResponse(token);
 
             if (!token.IsError)
@@ -58,7 +56,7 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
                 if (token.RefreshToken != null)
                 {
                     token = RefreshToken(token.RefreshToken);
-                    Console.WriteLine("Refresh Token");
+
                     ShowResponse(token);
 
                     //It should be possible to continue calling the service with the new token.
@@ -91,36 +89,15 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
             Console.ReadLine();
         }
 
-
-        static IonAPICredential LoadCredentialsFromFile(string afilename)
-        {
-            using (var reader = new StreamReader(afilename))
-                do
-                {
-                    var json = reader.ReadToEnd();
-                    return JsonConvert.DeserializeObject<IonAPICredential>(json);
-                } while (reader.EndOfStream);
-        }
-
-
-        static IonAPICredential LoadCredentialsFromRegistry(string akeyname)
-        {
-            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\TINE\IONAPI"))
-            {
-                object value = key.GetValue(akeyname);
-                string json = value.ToString();
-                return JsonConvert.DeserializeObject<IonAPICredential>(json);
-            }
-        }
-
         static void CallService(string token)
         {
-            var client = new HttpClient
+            var client = new HttpClient // One client per application
             {
                 BaseAddress = new Uri(IONAPI.IONAPIBaseUrl)
             };
 
             client.SetBearerToken(token);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
 
             var cmd = IONAPI.IONAPIBaseUrl + "/M3/m3api-rest/execute/MMS200MI/GetServerTime";
             cmd.ConsoleYellow();
