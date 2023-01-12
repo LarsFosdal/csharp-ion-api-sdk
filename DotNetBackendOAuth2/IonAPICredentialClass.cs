@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Thinktecture.IdentityModel.Extensions;
 
 namespace Infor.OAuth2SampleConsoleResourceOwner
 {
@@ -62,14 +63,31 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
             //return JsonConvert.DeserializeObject<IonAPICredential>(json);
         }
 
+        public static string Combine(string uri1, string uri2)
+        { 
+            return uri1.TrimEnd('/') + "/" + uri2.TrimStart('/');
+        }
 
+        public void Dump()
+        {
+            Console.Write("Client ID\t");
+            ResourceOwnerClientId.ConsoleGreen();
+            Console.Write("Client secret\t");
+            ResourceOwnerClientSecret.ConsoleGreen();
+            Console.Write("Auth endpoint\t");
+            OAuth2AuthorizationEndpoint.ConsoleGreen();
+            Console.Write("Token endpoint\t");
+            OAuth2TokenEndpoint.ConsoleGreen();
+            Console.Write("API base URL\t");
+            IONAPIBaseUrl.ConsoleGreen();
+        }
 
         public string ResourceOwnerClientId { get { return ci; } } 
         public string ResourceOwnerClientSecret { get { return cs; } } 
-        public string OAuth2TokenEndpoint { get { return pu + '/' + ot; } } 
-        public string OAuth2TokenRevocationEndpoint { get { return pu + '/' + or; } } 
-        public string OAuth2AuthorizationEndpoint { get { return pu + '/' + oa; } } 
-        public string IONAPIBaseUrl { get { return iu + '/' + ti; } } 
+        public string OAuth2TokenEndpoint { get { return Combine(pu, ot); } } 
+        public string OAuth2TokenRevocationEndpoint { get { return Combine(pu, or); } } 
+        public string OAuth2AuthorizationEndpoint { get { return Combine(pu, oa); } } 
+        public string IONAPIBaseUrl { get { return Combine(iu, ti); } } 
         public string ServiceAccountAccessKey { get { return saak; } } 
         public string ServiceAccountSecretKey { get { return sask; } }
 

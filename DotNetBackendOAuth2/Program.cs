@@ -1,13 +1,8 @@
-﻿using Microsoft.Win32;
-using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Net.Http;
-using System.Net.Mime;
 using Thinktecture.IdentityModel.Client;
 using Thinktecture.IdentityModel.Extensions;
-//using Thinktecture.IdentityModel.Http;
 
 namespace Infor.OAuth2SampleConsoleResourceOwner
 {
@@ -35,6 +30,7 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
         {
             IONAPI = IonAPICredential.FromRegistry("TIP_FOSLAR_test_ONPREM");
             //IONAPI = IonAPICredential.FromRegistry("TIP_FOSLAR_test_CLOUD");
+            IONAPI.Dump();
 
 
             _oauth2 = new OAuth2Client(
@@ -49,46 +45,61 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
 
             if (!token.IsError)
             {
-                //Use the access_token to make a call to ION API
-                CallService(token.AccessToken);
-
-                //If a refresh token is available the application can obtain new access_token after those have expired.
-                if (token.RefreshToken != null)
-                {
-                    token = RefreshToken(token.RefreshToken);
-
-                    ShowResponse(token);
-
-                    //It should be possible to continue calling the service with the new token.
-
-                    if (!token.IsError)
-                    {
-                        CallService(token.AccessToken);
-                    }
-                }
-
-
-                //When there is no need for the token it should be revoked so no further access is allowed.
-                RevokeToken(token.AccessToken, OAuth2Constants.AccessToken);
-
-                //If the refresh token is provided is recommended to revoke the refresh token.
-                if (token.RefreshToken != null)
-                {
-                    RevokeToken(token.RefreshToken, OAuth2Constants.RefreshToken);
-                }
-
-                //It is not possible to use the access_token anymore...
-                CallService(token.AccessToken);
-
-                //It should not be possible to refresh the token again...
-                token = RefreshToken(token.RefreshToken);
-                Console.WriteLine("Refresh Token");
-                ShowResponse(token);
+                SimpleTest(token);
+                //CompleteTest(token);
             }
+
             Console.WriteLine("\n\nPress Enter");
             Console.ReadLine();
         }
 
+        static void SimpleTest(TokenResponse token)
+        {
+            //Use the access_token to make a call to ION API
+            CallService(token.AccessToken);
+            RevokeToken(token.AccessToken, OAuth2Constants.AccessToken);
+
+        }
+        static void CompleteTest(TokenResponse token)
+        {
+            //Use the access_token to make a call to ION API
+            CallService(token.AccessToken);
+
+            //If a refresh token is available the application can obtain new access_token after those have expired.
+            if (token.RefreshToken != null)
+            {
+                token = RefreshToken(token.RefreshToken);
+
+                ShowResponse(token);
+
+                //It should be possible to continue calling the service with the new token.
+
+                if (!token.IsError)
+                {
+                    CallService(token.AccessToken);
+                }
+            }
+
+
+            //When there is no need for the token it should be revoked so no further access is allowed.
+            RevokeToken(token.AccessToken, OAuth2Constants.AccessToken);
+
+            //If the refresh token is provided is recommended to revoke the refresh token.
+            if (token.RefreshToken != null)
+            {
+                RevokeToken(token.RefreshToken, OAuth2Constants.RefreshToken);
+            }
+
+            //It is not possible to use the access_token anymore...
+            CallService(token.AccessToken);
+
+            //It should not be possible to refresh the token again...
+            token = RefreshToken(token.RefreshToken);
+            Console.WriteLine("Refresh Token");
+            ShowResponse(token);
+        }
+
+        
         static void CallService(string token)
         {
             var client = new HttpClient // One client per application
@@ -96,11 +107,14 @@ namespace Infor.OAuth2SampleConsoleResourceOwner
                 BaseAddress = new Uri(IONAPI.IONAPIBaseUrl)
             };
 
+            var cmd = IONAPI.IONAPIBaseUrl + "/M3/m3api-rest/execute/MMS200MI/GetServerTime";
+            //var cmd = IONAPI.IONAPIBaseUrl + "/M3/m3api-rest/v2/execute/MMS200MI/GetServerTime";
+            //var cmd = IONAPI.IONAPIBaseUrl + "/M3/m3api-rest/v2/execute/MMS200MI?dateformat=YMD8&excludeempty=false&righttrim=true&format=PRETTY&extendedresult=true";
+            //var cmd = IONAPI.IONAPIBaseUrl + "IDM/api/items/count?%24query=%2FTest";
+            cmd.ConsoleYellow();
+
             client.SetBearerToken(token);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-
-            var cmd = IONAPI.IONAPIBaseUrl + "/M3/m3api-rest/execute/MMS200MI/GetServerTime";
-            cmd.ConsoleYellow();
 
             var response = client.GetAsync(cmd).Result;
 
